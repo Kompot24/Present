@@ -1,12 +1,12 @@
 import discord
 from discord.ext import commands, tasks
 import os
+import pygame
 import sys
 import psutil
 import multiprocessing
 import tkinter as tk
 from PIL import Image, ImageTk
-import pygame
 import asyncio
 import random
 import pyautogui
@@ -32,8 +32,11 @@ import shutil
 from tkinter import ttk
 from dotenv import load_dotenv
 
+pygame.mixer.init()
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')
+start_time = time.time()
 pixel_process = None
 mouse_swapped = False
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -92,10 +95,9 @@ AVAILABLE_APPS = {
     "Блокнот": "notepad.exe",
     "Калькулятор": "calc.exe",
     "Soundpad": r"D:\Рабочий стол\Soundpad\Soundpad.exe",
-    "Dota": r"E:\SteamLibrary\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe"
+    "Dota": r"C:\SteamLibrary\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe"
 }
 
-pygame.mixer.init()
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
 
@@ -859,11 +861,56 @@ async def restart(ctx: discord.ApplicationContext):
     if is_owner or has_role:
         await ctx.respond("🔄 **Выполняю перезапуск системы...** Бот вернется в сеть через несколько секунд.")
         
-        # Завершаем работу текущего процесса и запускаем новый
-        # Это сработает и в паре с твоим батником!
         os.execv(sys.executable, ['python'] + sys.argv)
     else:
         await ctx.respond("❌ **У вас нет прав администратора** для выполнения этой команды.", ephemeral=True)
+
+@bot.slash_command(name='status', description='Показать состояние системы и нагрузку ПК', guild_ids=[711194167757242368])
+async def status_slash(ctx: discord.ApplicationContext):
+    # 1. Расчет времени работы бота
+    uptime_seconds = int(time.time() - start_time)
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    uptime_str = f"{hours}ч {minutes}м {seconds}с"
+
+    # 2. Получение данных о системе через psutil
+    cpu_usage = psutil.cpu_percent(interval=1)
+    ram = psutil.virtual_memory()
+    ram_usage = ram.percent
+    
+    # Свободное место на диске C: (в ГБ)
+    disk = shutil.disk_usage("C:")
+    disk_free = disk.free // (1024**3)
+
+    # 3. Статус активных приколов
+    pixel_stat = "🔴 Активен" if pixel_process and pixel_process.is_alive() else "⚪ Выключен"
+    mouse_stat = "🔄 Инвертированы" if mouse_swapped else "✅ Норма"
+
+    # Создаем красивый Embed
+    embed = discord.Embed(
+        title="🖥️ Мониторинг системных ресурсов",
+        color=discord.Color.blue(),
+        timestamp=discord.utils.utcnow()
+    )
+
+    embed.add_field(name="⏱️ Аптайм бота", value=f"`{uptime_str}`", inline=True)
+    embed.add_field(name="🐍 Python", value=f"`{sys.version.split()[0]}`", inline=True)
+    embed.add_field(name="💾 Диск C:", value=f"`{disk_free} ГБ свободно`", inline=True)
+
+    embed.add_field(name="📊 Нагрузка", value=(
+        f"**CPU:** `{cpu_usage}%`\n"
+        f"**RAM:** `{ram_usage}%` ({ram.used // (1024**2)} МБ)"
+    ), inline=False)
+
+    embed.add_field(name="🎮 Статус модулей", value=(
+        f"**Битый пиксель:** {pixel_stat}\n"
+        f"**Кнопки мыши:** {mouse_stat}\n"
+        f"**Target:** `{TARGET_PROCESS}`"
+    ), inline=False)
+
+    embed.set_footer(text=f"Запросил: {ctx.author.name}")
+    
+    await ctx.respond(embed=embed)
 
 if __name__ == '__main__':
     multiprocessing.freeze_support() 
