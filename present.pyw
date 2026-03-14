@@ -102,7 +102,25 @@ bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
 @bot.event
 async def on_ready():
     print('□♥□♥□♥□♥□♥□♥□♥')
-    check_game.start()
+
+    if not check_game.is_running():
+        check_game.start()
+
+    try:
+        user = await bot.fetch_user(ALLOWED_USER_ID)
+        if user:
+            # Собираем инфо о системе
+            ver = sys.version.split()[0]
+            host = os.getlogin()
+            status_msg = (
+                f"🚀 **Система управления ПК запущена!**\n"
+                f"👤 **Хост:** `{host}`\n"
+                f"🐍 **Python:** `{ver}`\n"
+                f"📂 **Директория:** `{BASE_DIR}`\n"
+            )
+            await user.send(status_msg)
+    except Exception as e:
+        print(f"Не удалось отправить отчет админу: {e}")
 
 def show_fullscreen_process(img_path):
     root = tk.Tk()
@@ -832,13 +850,20 @@ async def reboot_pc_slash(ctx: discord.ApplicationContext):
         await ctx.channel.send(f"❌ Ошибка при попытке перезагрузки системы: {e}")
 
 
-@bot.command(name='restart', guild_ids=[711194167757242368])
-async def restart(ctx):
-    if any(role.id == ALLOWED_ROLE_ID for role in ctx.author.roles) or ctx.author.id == ALLOWED_USER_ID:
-        await ctx.send("Выполняю рестарт...")
+@bot.slash_command(name='restart', description='Полная перезагрузка бота', guild_ids=[711194167757242368])
+async def restart(ctx: discord.ApplicationContext):
+    # Проверка прав (как и в других твоих командах)
+    is_owner = ctx.author.id == ALLOWED_USER_ID
+    has_role = any(role.id == ALLOWED_ROLE_ID for role in ctx.author.roles)
+
+    if is_owner or has_role:
+        await ctx.respond("🔄 **Выполняю перезапуск системы...** Бот вернется в сеть через несколько секунд.")
+        
+        # Завершаем работу текущего процесса и запускаем новый
+        # Это сработает и в паре с твоим батником!
         os.execv(sys.executable, ['python'] + sys.argv)
     else:
-        await ctx.send("У вас нет прав.")
+        await ctx.respond("❌ **У вас нет прав администратора** для выполнения этой команды.", ephemeral=True)
 
 if __name__ == '__main__':
     multiprocessing.freeze_support() 
