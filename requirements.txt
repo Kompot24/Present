@@ -1,0 +1,14 @@
+py-cord
+psutil
+Pillow
+pygame
+pyautogui
+pyttsx3
+pyperclip
+pywin32
+wmi
+screen-brightness-control
+plyer
+sounddevice
+scipy
+python-dotenv

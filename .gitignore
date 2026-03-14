@@ -1,0 +1,7 @@
+screen.png
+spy_record.wav
+
+__pycache__/
+*.pyc
+
+.env
