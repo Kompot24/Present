@@ -12,3 +12,4 @@ plyer
 sounddevice
 scipy
 python-dotenv
+pynput

