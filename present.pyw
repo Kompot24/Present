@@ -35,7 +35,6 @@ from pynput import mouse
 from pynput import keyboard
 
 pygame.mixer.init()
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 load_dotenv()
 
@@ -112,7 +111,8 @@ AVAILABLE_SOUNDS = {
     "Mama": "sounds/Ma.mp3",
     "Intro": "sounds/Intro.mp3",
     "Femboy": "sounds/Femboy.mp3",
-    "Pivo": "sounds/pivo.mp3"
+    "Pivo": "sounds/pivo.mp3",
+    "MetalPipe": "sounds/metalpipe.mp3"
 }
 AVAILABLE_IMAGES = {
     "Первая картинка": "images/IMG_6242.JPG",
@@ -126,8 +126,12 @@ AVAILABLE_IMAGES = {
     "Byrat": "images/5269660225357157270.jpg",
     "KrytoiVodolaZ": "images/5397966205752118305.jpg",
     "VanyaSong": "images/edbe23aa-cd77-4ccc-a811-12692154148b.jpg",
-    "Orygez": "images/d8dd0c1dffde2af1a1844473a6788b1e.jpg"
+    "Orygez": "images/d8dd0c1dffde2af1a1844473a6788b1e.jpg",
+    "Anya": "images/ba6b068a-6d42-45d4-871b-a6d4b2a8ebbf2.png",
+    "Pchel": "images/ba6b068a-6d42-45d4-871b-a6d4b2a8ebbf23.jpg",
+    "Pipe": "images/ba6b068a-6d42-45d4-871b-a6d4b2a8ebbf4.jpg"
 }
+
 
 AVAILABLE_APPS = {
     "Блокнот": "notepad.exe",
@@ -144,6 +148,7 @@ GAMES_EXES = {
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
+
 
 @bot.event
 async def on_ready():
@@ -280,6 +285,8 @@ async def check_game():
         if window_process and window_process.is_alive() and window_opened_by == 'auto':
             window_process.terminate()
             print(f"{TARGET_PROCESS} закрыт. Закрываю окно.")
+
+
 
 def purgatory_logic():
     import win32gui, win32api, win32con, random, time, ctypes
